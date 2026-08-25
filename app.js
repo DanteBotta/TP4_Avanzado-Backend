@@ -1,25 +1,48 @@
 import pkg from 'pg'
 import dbconfig from './dbconfig.js'
 import express from 'express'
+import bcrypt from 'crypto'
 
 const {Client} = pkg;
 const client = new Client(dbconfig)
 await client.connect()
 
-const result = await client.query("SELECT * FROM usuarios")
-console.log(result.rows)
-const usuario1 = result.rows[0].nombre
-console.log("usuario1:",usuario1)
-
 await client.end()
 
 const app = express()
 // const port = 3000;
-app.get('/',(req,res)=>res.send("Welcome " + usuario1 ))
 
-// const PORT = process.env.PORT || 3000;
-// app.listen(PORT, () => {
-//  console.log(`Local en http://localhost:${PORT}`);
-// });
+app.post('/crearusuario', async (req, res) => {
+ const user = req.body;
 
-export default app;
+    if(!user.nombre || !user.userid || !user.password){
+        return res.status(400).json({ error: "Faltan datos" });
+    }
+
+    try{
+        const client = new Client(config);
+        await client.connect();
+        const hashedpassword = await bcrypt.hash(user.password, 10);
+        user.password = hashedpassword;
+        let result = await client.query("Insert into usuarios values ($1, $2, $3)", 
+        [user.userid, user.nombre, hashedpassword]);
+        await client.end();
+
+        return res.status(201).json({ mensaje: "Usuario creado correctamente" });
+    } catch (error) {
+        console.error(error);
+        return res.status(500).json({error: "Error al crear el usuario"});
+    }
+});
+
+app.post('/login', (req, res) => {
+
+})
+
+
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+ console.log(`Local en http://localhost:${PORT}`);
+});
+
+// export default app;
