@@ -13,6 +13,9 @@ const app = express()
 app.use(express.json());
 // const port = 3000;
 
+// Clave secreta para firmar el token
+const secretKey = 'Papestriglio67'
+
 app.get('/usuarios', async (req, res) => {
     try {
         const client = new Client(dbconfig);
@@ -22,10 +25,7 @@ app.get('/usuarios', async (req, res) => {
             "SELECT id, nombre, password FROM usuarios ORDER BY id"
         );
 
-        await client.end();
-
         return res.status(200).json(result.rows);
-        await client.end()
     } catch (error) {
         console.error(error);
         return res.status(500).json({
@@ -34,6 +34,63 @@ app.get('/usuarios', async (req, res) => {
     }
 });
 
+app.get('/escucho', async (req, res) => {
+
+    const authHeader = req.headers.authorization
+
+    console.log("authorization:", authHeader)
+
+    if (!authHeader) {
+        return res.status(401).json({
+            message: "Token inexistente"
+        })
+    }
+
+    const partes = authHeader.split(" ")
+
+    if (partes.length !== 2 || partes[0] !== "Bearer") {
+        return res.status(401).json({
+            message: "Formato de token incorrecto"
+        })
+    }
+
+    const token = partes[1]
+
+    console.log("token recibido:", token)
+
+    try {
+
+        const payloadoriginal = jwt.verify(token, secretKey)
+
+        console.log("payload:", payloadoriginal)
+
+        const infoCanciones = await client.query(
+            `SELECT e.reproducciones, c.nombre
+             FROM escucha e
+             INNER JOIN canciones c 
+             ON e.cancionesid = c.id
+             WHERE e.usuarioid = $1`,
+            [payloadoriginal.id]
+        )
+
+        if (infoCanciones.rowCount === 0) {
+            return res.status(404).json({
+                message: "Usuario no escuchó canciones"
+            })
+        }
+
+        return res.status(200).json(infoCanciones.rows)
+
+    } catch (error) {
+
+        console.log("ERROR JWT:", error.name)
+        console.log("MENSAJE:", error.message)
+
+        return res.status(401).json({
+            message: "Token inválido o expirado"
+        })
+    }
+})
 
 app.post('/crearusuario', async (req, res) => {
  const user = req.body;
@@ -103,16 +160,12 @@ app.post('/login', async (req, res) => {
             return res.status(401).json({ message: "Clave inválida" })
         }
 
-        // Datos para incluir en el token
         const payload = {
             id: dbUser.id,
             username: dbUser.nombre
         }
 
-        // Clave secreta para firmar el token
-        const secretKey = 'ClaveSecreta2000$'
 
-        // Opciones de la firma
         const options = {
             expiresIn: '1h',
             issuer: 'mi_organizacion'
@@ -127,7 +180,6 @@ app.post('/login', async (req, res) => {
         return res.json({
             token: token
         })
-        await client.end()
 
     } catch (error) {
         return res.status(500).json({ message: error.message })
