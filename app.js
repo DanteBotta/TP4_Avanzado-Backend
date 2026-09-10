@@ -2,7 +2,11 @@ import pkg from 'pg'
 import dbconfig from './dbconfig.js'
 import express from 'express'
 import bcrypt from 'bcrypt'
-import jwt from 'jsonwebtoken'
+import cors from 'cors'
+
+import cancionRouters from "router/cancionRouter.js"
+import escuchaRoutes from "router/escuchaRouter.js"
+import usuarioRouters from "router/usuarioRouter.js"
 
 const {Client} = pkg;
 const client = new Client(dbconfig)
@@ -10,11 +14,14 @@ await client.connect()
 
 
 const app = express()
-app.use(express.json());
-// const port = 3000;
+const port = 3000;
 
-// Clave secreta para firmar el token
-const secretKey = 'Papestriglio67'
+app.use(cors());
+app.use(express.json());
+app.use("/cancion", cancionRouters)
+app.use("/escucha", escuchaRoutes)
+app.use("/usuario", usuarioRouters)
+
 
 app.get('/usuarios', async (req, res) => {
     try {
@@ -172,7 +179,7 @@ app.post('/login', async (req, res) => {
         }
 
         // Generar el token
-        const token = jwt.sign(payload, secretKey, options)
+        const token = jwt.sign(payload, SecretKey, options)
 
         console.log(token)
 
@@ -187,8 +194,7 @@ app.post('/login', async (req, res) => {
 })
 
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+app.listen(port, () => {
  console.log(`Local en http://localhost:${PORT}`);
 });
 
